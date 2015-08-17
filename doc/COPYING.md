@@ -13,12 +13,14 @@ Szymon Stefanek and other members of the KVIrc Development Team.
 The source code for all versions of KVIrc is available at http://www.kvirc.net
 
 Have fun!
+
 Szymon Stefanek :)
 
 
 #### OpenSSL Exception
 
 1. Definitions
+
     "KVIrc" means KVIrc software licensed under version 2 or any later
     version of the GNU General Public License (collectively, "GPL"), or a
     work based on such software and licensed under the GPL.
@@ -32,6 +34,7 @@ Szymon Stefanek :)
     as those licenses appear in the file LICENSE-OPENSSL.
 
 2. Exception
+
     You have permission to copy, modify, propagate, and distribute a work
     formed by combining OpenSSL with KVIrc, or a work derivative of such a
     combination, even if such copying, modification, propagation, or
@@ -47,4 +50,5 @@ Szymon Stefanek :)
 
 #### Additional licenses:
 
-Splash screen's contains work from Natalia Romay: "Equilibrium" released under Attribution-NonCommercial-ShareAlike 2.0 Generic (CC BY-NC-SA 2.0)
+Splash screen's contains work from Natalia Romay: "Equilibrium" released under
+Attribution-NonCommercial-ShareAlike 2.0 Generic (CC BY-NC-SA 2.0)
