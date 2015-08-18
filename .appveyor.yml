@@ -54,6 +54,7 @@ install:
             # Teach qmake.exe about where it is located
             & "c:\Qt-tversoft\$env:qt_ver\qtbinpatcher.exe" "--qt-dir=c:/Qt-tversoft/$env:qt_ver"
         }
+        c:\cygwin\bin\bash -c 'rm -f /cygdrive/c/Qt-tversoft/*.7z'
     - ps: |
         if (Test-Path "c:\OpenSSL-$env:ssl_arch") {
             echo "using openssl from cache"
@@ -80,7 +81,7 @@ install:
             c:\cygwin\bin\touch /cygdrive/c/Strawberry/kvirc_workaround
         }
     - ps: |
-        if (Test-Path "c:/ProgramData/chocolatey/bin/jom") {
+        if (Test-Path "c:/ProgramData/chocolatey/bin/jom.exe") {
             echo "using jom from cache"
         } else {
             choco install jom
@@ -176,3 +177,15 @@ build_script:
         $new_name = $exe.Replace(".exe", "-$env:target_arch.exe")
         Push-AppveyorArtifact $exe -FileName $new_name
 test: off
+# Upload installer to kvirc.d00p.de
+deploy:
+  provider: FTP
+  protocol: ftp
+  host:
+    secure: j/QMZIWjw1PO1NmBNRjeZA==
+  username:
+    secure: LGLjbFeFZcpNFnnkHGXX4g==
+  password:
+    secure: 4S03mCVua0ENN3fmxF07XOvDfuN9AgPsUB4jyLS2RD0=
+  folder: /
+  artifact: /.*\.exe/
