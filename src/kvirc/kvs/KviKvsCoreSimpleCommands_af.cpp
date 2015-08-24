@@ -40,19 +40,18 @@
 #include "KviKvsKernel.h"
 #include "KviKvsObjectController.h"
 
-#if (QT_VERSION >= 0x050000)
-	#ifndef COMPILE_NO_X_BELL
-		#define COMPILE_NO_X_BELL
-	#endif // QX11Info is not available with Qt5
-#endif
 
-#ifdef COMPILE_X11_SUPPORT
+#if defined(COMPILE_X11_SUPPORT) && defined(COMPILE_QX11INFO_SUPPORT)
 	#ifndef COMPILE_NO_X_BELL
 		#include "KviXlib.h" // XBell : THIS SHOULD BE INCLUDED AS LAST!
 		#include <unistd.h>   // for usleep();
 
-		#include <qx11info_x11.h>
+		#include <QX11Info>
 		#define get_xdisplay QX11Info::display
+	#endif
+#else
+	#ifndef COMPILE_NO_X_BELL
+		#define COMPILE_NO_X_BELL
 	#endif
 #endif
 #include "KviTalToolTip.h"
@@ -1210,7 +1209,7 @@ namespace KviKvsCoreSimpleCommands
 			but the command parameters are evaluated in the current window.[br]
 			If the 'i' switch is given, it uses the specified
 			icon scheme (icon and colors), otherwise it uses
-			the default one (0).[br]
+			the default one.[br]
 			If the -n switch is present then the highlighting rules
 			are not applied.[br]
 			If the -x switch is present then the message will never cause
@@ -1246,19 +1245,11 @@ namespace KviKvsCoreSimpleCommands
 		int type = KVI_OUT_NONE;
 		KviWindow * pWnd = KVSCSC_pWindow;
 		KviConsoleWindow * pConsole = pWnd->console();
-		if(!pConsole)pConsole = g_pApp->activeConsole();
+		if(!pConsole)
+			pConsole = g_pApp->activeConsole();
 
 		KviKvsVariant * v;
 
-		if( (v = KVSCSC_pSwitches->find('i',"color-set")) )
-		{
-			kvs_int_t msgType;
-			if(v->asInteger(msgType))
-			{
-				if(msgType < 0)msgType = -msgType;
-				type = (int)(msgType % KVI_NUM_MSGTYPE_OPTIONS);
-			} else KVSCSC_pContext->warning(__tr2qs_ctx("Invalid color-set specification, using default","kvs"));
-		}
 
 		if( (v = KVSCSC_pSwitches->find('w',"window")) )
 		{
@@ -1269,6 +1260,31 @@ namespace KviKvsCoreSimpleCommands
 			{
 				KVSCSC_pContext->warning(__tr2qs_ctx("Window '%Q' not found, using current one","kvs"),&szWin);
 				pWnd = KVSCSC_pWindow;
+			}
+		}
+
+		if( (v = KVSCSC_pSwitches->find('i',"color-set")) )
+		{
+			kvs_int_t msgType;
+			if(v->asInteger(msgType))
+			{
+				if(msgType < 0)msgType = -msgType;
+				type = (int)(msgType % KVI_NUM_MSGTYPE_OPTIONS);
+			} else KVSCSC_pContext->warning(__tr2qs_ctx("Invalid color-set specification, using default","kvs"));
+		} else {
+			bool bIsMe = pWnd->connection() && KviQString::equalCI(pWnd->connection()->currentNickName(),szNick);
+		
+			switch(pWnd->type())
+			{
+				case KviWindow::Channel:
+					type = bIsMe ? KVI_OUT_OWNPRIVMSG : KVI_OUT_CHANPRIVMSG;
+				break;
+				case KviWindow::Query:
+					type = bIsMe ? KVI_OUT_OWNPRIVMSG : KVI_OUT_QUERYPRIVMSG;
+				break;
+				default:
+					// keep KVI_OUT_NONE
+				break;
 			}
 		}
 

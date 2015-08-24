@@ -3,6 +3,33 @@
 ## KVIrc CMake global configuration file.
 ##
 ###############################################################################
+##
+## Conventions for variables:
+##
+##    WANT_*           : Switches that enable/disable features
+##                       Example: WANT_QT4 (force Qt4 usage)
+##
+##    CMAKE_STATUS_*   : Text variables used to display the final configuration
+##                       at the end of the cmake script run. Their format is
+##                       not fixed therefore they should be not relied upon
+##                       inside this script (i.e. don't check their value).
+##                       Example: CMAKE_STATUS_X11_SUPPORT (can be "Yes", "No",
+##                       "Yes, with scrnsaveproto" or whatever "Blah").
+##
+##    CMAKE_RESULT_*   : Contain a result of a cmake script computation
+##                       in a fixed format (of any type). Used only inside
+##                       the cmake script.
+##                       Example: CMAKE_RESULT_USING_QT5 either true or false
+##
+##    COMPILE_*        : Variables that end up in kvi_sysconfig.h and are
+##                       visible in code (usually #defined to 1 or undefined)
+##                       Example: COMPILE_IPV6_SUPPORT (set to 1 or unset)
+##                        
+##    CMAKE_KVIRC_*    : Variables that end up in kvi_sysconfig.h or
+##                       kvi_sysbuildinfo.h as KVIRC_* and are usually textual
+##                       Example: CMAKE_KVIRC_MODULES_DIR (a textual path)
+##
+###############################################################################
 
 ###############################################################################
 # GLOBAL DEFS
@@ -15,16 +42,17 @@ project(kvirc)
 set(CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS true)
 
 # Minimum cmake version
-cmake_minimum_required(VERSION 2.8.6)
+cmake_minimum_required(VERSION 2.8.12)
 
-# remove when we require cmake 2.8.11+
+# CMake policy: Automatically link Qt executables to qtmain.lib target on Windows
 if(POLICY CMP0020)
 	cmake_policy(SET CMP0020 NEW)
 endif()
-# fix the project to the new-style policy when we require cmake 2.8.10+
-# and remove it when we require cmake 3.0+
+
+# CMake policy: Ignore COMPILE_DEFINITIONS_<Config> properties.
+# FIXME: We don't actually use this at all?
 if(POLICY CMP0043)
-	cmake_policy(SET CMP0043 OLD)
+	cmake_policy(SET CMP0043 NEW)
 endif()
 
 # Check modules first in local dir
@@ -35,9 +63,9 @@ set(PACKAGE "kvirc")
 set(NICENAME "KVIrc")
 set(VERSION_MAJOR "4")
 set(VERSION_BRANCH "4.3")
-set(VERSION_RELEASE "4.3.1")
-set(VERSION_CODENAME "Aria")
-# REMINDER: "Quasar" is a new candidate.
+set(VERSION_RELEASE "4.3.2")
+set(VERSION_CODENAME "Quasar")
+# REMINDER: Write here new candidate names :)
 
 string(REGEX MATCH "[0-9]+$" VERSION_MINOR ${VERSION_BRANCH})
 
@@ -64,8 +92,6 @@ set(MANUAL_REVISION
 	CACHE STRING "Manually set the revision number"
 )
 
-
-
 string(COMPARE EQUAL "${MANUAL_REVISION}" "" MANUAL_REVISION_UNSET)
 if(MANUAL_REVISION_UNSET)
 	# No manually forced revision number, gotta guess one now
@@ -91,7 +117,6 @@ if(MANUAL_REVISION_UNSET)
 			else()
 				message( STATUS "Git failed (not a repo, or no tags). Build will not contain git revision info." )
 			endif()
-			
 		else()
 			message( STATUS "Git not found. Build will not contain git revision info." )
 		endif()
@@ -386,6 +411,9 @@ endif()
 
 option(WANT_QT4 "Whether to prefer Qt4 over Qt5" OFF)
 
+# Assume we're using Qt5 (may be reset below)
+set(CMAKE_RESULT_USING_QT5 true)
+
 if(WANT_QT4)
 	find_package(Qt4 4.7.0)
 	if(NOT QT4_FOUND)
@@ -393,6 +421,7 @@ if(WANT_QT4)
 		set(CMAKE_STATUS_QT_VERSION "None")
 	else()
 		set(CMAKE_STATUS_QT_VERSION "${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}.${QT_VERSION_PATCH}")
+		set(CMAKE_RESULT_USING_QT5 false)
 	endif()
 else()
 	find_package(Qt5Widgets)
@@ -404,6 +433,7 @@ else()
 		if(QT4_FOUND)
 			set(CMAKE_STATUS_QT_VERSION "${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}.${QT_VERSION_PATCH}")
 			set(WANT_QT4 ON CACHE BOOL "Whether to prefer Qt4 over Qt5" FORCE)
+			set(CMAKE_RESULT_USING_QT5 false)
 		else()
 			message(FATAL_ERROR "No Qt4 or Qt5 found!")
 		endif()
@@ -424,62 +454,12 @@ endif()
 option(WANT_QTWEBKIT "Whether to compile Qt-WebKit support" ON)
 option(WANT_QTSVG "Whether to compile Qt-Svg support" ON)
 
-# Qt4 stuff
-if(QT4_FOUND)
-	set(QT_USE_QTSQL true)
-	set(QT_USE_QTXML true)
-	set(QT_USE_QTNETWORK true)
+# May be re-set below, if the proper libs are found.
+set(CMAKE_STATUS_QX11INFO_SUPPORT "Not available")
 
-	# Qt-DBus support
-	if(WANT_QTDBUS)
-		if(QT_QTDBUS_FOUND)
-			set(QT_USE_QTDBUS true)
-			set(CMAKE_STATUS_QTDBUS_SUPPORT "Yes")
-			set(COMPILE_DBUS_SUPPORT 1)
-		else()
-			set(CMAKE_STATUS_QTDBUS_SUPPORT "Not available")
-		endif()
-	else()
-		set(CMAKE_STATUS_QTDBUS_SUPPORT "No")
-	endif()
+if(CMAKE_RESULT_USING_QT5)
+	# Qt 5
 
-	# Qt-WebKit support
-	if(WANT_QTWEBKIT)
-		if(QT_QTWEBKIT_FOUND)
-			set(QT_USE_QTWEBKIT true)
-			set(CMAKE_STATUS_QTWEBKIT_SUPPORT "Yes")
-			set(COMPILE_WEBKIT_SUPPORT 1)
-		else()
-			set(CMAKE_STATUS_QTWEBKIT_SUPPORT "Not available")
-		endif()
-	else()
-		set(CMAKE_STATUS_QTWEBKIT_SUPPORT "No")
-	endif()
-	# Qt-Svg support
-	if(WANT_QTSVG)
-		if(QT_QTSVG_FOUND)
-			set(QT_USE_QTSVG true)
-			set(CMAKE_STATUS_QTSVG_SUPPORT "Yes")
-			set(COMPILE_SVG_SUPPORT 1)
-		else()
-			set(CMAKE_STATUS_QTSVG_SUPPORT "Not available")
-		endif()
-	else()
-		set(CMAKE_STATUS_QTSVG_SUPPORT "No")
-	endif()
-
-	# qtmain for non-debug MSVC (/subsystem:windows), MinGW can live without it.
-	if(MSVC AND NOT WANT_DEBUG)
-		set(QT_USE_QTMAIN true)
-	endif()
-
-	include(${QT_USE_FILE})
-	include_directories(${QT_INCLUDES})
-	list(APPEND LIBS ${QT_LIBRARIES})
-
-endif()
-
-if(Qt5Widgets_FOUND)
 	include_directories(${Qt5Widgets_INCLUDE_DIRS})
 	list(APPEND qt5_kvirc_modules Widgets)
 
@@ -537,6 +517,7 @@ if(Qt5Widgets_FOUND)
 			set(COMPILE_WEBKIT_SUPPORT 1)
 		endif()
 	endif()
+
 	# Qt-Svg support
 	if(WANT_QTSVG)
 		find_package(Qt5Svg)
@@ -546,6 +527,7 @@ if(Qt5Widgets_FOUND)
 			set(COMPILE_SVG_SUPPORT 1)
 		endif()
 	endif()
+
 	if(WIN32)
 		find_package(Qt5WinExtras)
 		if(Qt5WinExtras_FOUND)
@@ -553,37 +535,153 @@ if(Qt5Widgets_FOUND)
 			include_directories(${Qt5WinExtras_INCLUDE_DIRS})
 		endif()
 	endif()
+
+	# Qt5 requires the X11Extras module for the QX11Info class (which is needed for XSS support and other stuff)
+	if(UNIX)
+		if(NOT MAC)
+			find_package(Qt5X11Extras)
+			if(Qt5X11Extras_FOUND)
+				# Qt4 has QX11Info
+				set(COMPILE_QX11INFO_SUPPORT 1)
+				set(CMAKE_STATUS_QX11INFO_SUPPORT "Yes")
+				list(APPEND qt5_kvirc_modules X11Extras)
+				include_directories(${Qt5X11Extras_INCLUDE_DIRS})
+			endif()
+		endif()
+	endif()
+else()
+	# Qt 4
+	set(QT_USE_QTSQL true)
+	set(QT_USE_QTXML true)
+	set(QT_USE_QTNETWORK true)
+
+	# Qt-DBus support
+	if(WANT_QTDBUS)
+		if(QT_QTDBUS_FOUND)
+			set(QT_USE_QTDBUS true)
+			set(CMAKE_STATUS_QTDBUS_SUPPORT "Yes")
+			set(COMPILE_DBUS_SUPPORT 1)
+		else()
+			set(CMAKE_STATUS_QTDBUS_SUPPORT "Not available")
+		endif()
+	else()
+		set(CMAKE_STATUS_QTDBUS_SUPPORT "No")
+	endif()
+
+	# Qt-WebKit support
+	if(WANT_QTWEBKIT)
+		if(QT_QTWEBKIT_FOUND)
+			set(QT_USE_QTWEBKIT true)
+			set(CMAKE_STATUS_QTWEBKIT_SUPPORT "Yes")
+			set(COMPILE_WEBKIT_SUPPORT 1)
+		else()
+			set(CMAKE_STATUS_QTWEBKIT_SUPPORT "Not available")
+		endif()
+	else()
+		set(CMAKE_STATUS_QTWEBKIT_SUPPORT "No")
+	endif()
+
+	# Qt-Svg support
+	if(WANT_QTSVG)
+		if(QT_QTSVG_FOUND)
+			set(QT_USE_QTSVG true)
+			set(CMAKE_STATUS_QTSVG_SUPPORT "Yes")
+			set(COMPILE_SVG_SUPPORT 1)
+		else()
+			set(CMAKE_STATUS_QTSVG_SUPPORT "Not available")
+		endif()
+	else()
+		set(CMAKE_STATUS_QTSVG_SUPPORT "No")
+	endif()
+
+	# qtmain for non-debug MSVC (/subsystem:windows), MinGW can live without it.
+	if(MSVC AND NOT WANT_DEBUG)
+		set(QT_USE_QTMAIN true)
+	endif()
+
+	# Qt4 has QX11Info
+	set(COMPILE_QX11INFO_SUPPORT 1)
+	set(CMAKE_STATUS_QX11INFO_SUPPORT "Yes")
+
+	include(${QT_USE_FILE})
+	include_directories(${QT_INCLUDES})
+	list(APPEND LIBS ${QT_LIBRARIES})
+
 endif()
+
 
 ############################################################################
 # Check for KDE4
 ############################################################################
 
-option(WANT_KDE4 "Whether to use KDE4 support" ON)
-if(WANT_KDE4 AND WANT_QT4)
-	find_package(Qt4 4.6.0)
-	if(QT4_FOUND)
+option(WANT_KDE "Whether to use KDE support" ON)
+
+set(CMAKE_RESULT_USING_KDE false)
+
+if(WANT_KDE)
+	if(CMAKE_RESULT_USING_QT5)
+		# Using Qt5 -> KDE5
+		find_package(ECM 1.0.0 NO_MODULE)
+		if(DEFINED ECM_VERSION_MAJOR)
+			set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${ECM_KDE_MODULE_DIR} ${CMAKE_MODULE_PATH})
+	 
+			find_package(KF5 "5.2.0" COMPONENTS
+					CoreAddons      # KAboutData
+					I18n            # KLocalizedString
+					XmlGui          # KMainWindow
+					WindowSystem    # KWindowSystem
+					Notifications   # KNotification
+					Service         # KToolInvocation
+				)
+			
+			if(KF5_FOUND)
+				set(CMAKE_RESULT_USING_KDE true)
+				#include_directories(${KDE4_INCLUDES})
+				#add_definitions(${KDE4_DEFINITIONS})
+				set(COMPILE_KDE_SUPPORT 1)
+				# There seems to be no portable way to figure out if KDE version is 4 or 5
+				set(COMPILE_KDE5_SUPPORT 1)
+				list(APPEND LIBS KF5::CoreAddons KF5::I18n KF5::XmlGui KF5::WindowSystem KF5::Notifications KF5::Service)
+				set(CMAKE_STATUS_KDE_SUPPORT "Yes")
+				if(DEFINED KF5_VERSION)
+					set(CMAKE_STATUS_KDE_VERSION ${KF5_VERSION})
+				else()
+					set(CMAKE_STATUS_KDE_VERSION "5.X")
+				endif()
+			else()
+				set(CMAKE_STATUS_KDE_SUPPORT "Not available (KF5 not found)")
+			endif()
+		else()
+			set(CMAKE_STATUS_KDE_SUPPORT "Not available (ECM not found)")
+		endif()
+	else()
+		# Using Qt4 -> KDE4
 		find_package(KDE4)
 		if(KDE4_FOUND)
+			set(CMAKE_RESULT_USING_KDE true)
 			include_directories(${KDE4_INCLUDES})
 			add_definitions(${KDE4_DEFINITIONS})
 			set(COMPILE_KDE_SUPPORT 1)
+			# There seems to be no portable way to figure out if KDE version is 4 or 5
+			set(COMPILE_KDE4_SUPPORT 1)
 			list(APPEND LIBS ${KDE4_KDECORE_LIBS} ${KDE4_KDEUI_LIBRARY} ${KDE4_KPARTS_LIBRARY} ${KDE4_KFILE_LIBRARY} ${KDE4_KIO_LIBRARY} ${KDE4_SOLID_LIBRARY})
-			set(CMAKE_STATUS_KDE4_SUPPORT "Yes")
+			set(CMAKE_STATUS_KDE_SUPPORT "Yes")
+			if(DEFINED KDE_VERSION)
+				set(CMAKE_STATUS_KDE_VERSION ${KDE_VERSION})
+			else()
+				set(CMAKE_STATUS_KDE_VERSION "4.X")
+			endif()
 			# The FindKDE4Internal cmake module adds -Wl,--no-undefined
 			# to the CMAKE_MODULE_LINKER_FLAGS .. which is not good for us
 			string(REPLACE "-Wl,--no-undefined" "" CMAKE_MODULE_LINKER_FLAGS ${CMAKE_MODULE_LINKER_FLAGS})
 			# and for kvilib...
 			string(REPLACE "-Wl,--no-undefined" "" CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS})
 		else()
-			set(CMAKE_STATUS_KDE4_SUPPORT "Not available")
+			set(CMAKE_STATUS_KDE_SUPPORT "Not available (KDE4 not found)")
 		endif()
 	endif()
-elseif(NOT WANT_QT4)
-	# Must be Qt4
-	set(CMAKE_STATUS_KDE4_SUPPORT "Unsupported with Qt5")
 else()
-	set(CMAKE_STATUS_KDE4_SUPPORT "No")
+	set(CMAKE_STATUS_KDE_SUPPORT "Not requested")
 endif()
 
 # Check for X11
@@ -595,15 +693,20 @@ if(UNIX)
 		find_package(X11)
 		if(X11_FOUND)
 			set(COMPILE_X11_SUPPORT 1)
+			# The X screensaver stuff is in the libxss-dev package (ubuntu/debian)
 			if(X11_Xscreensaver_FOUND)
-				set(COMPILE_XSS_SUPPORT 1)
-				set(CMAKE_STATUS_X11_SUPPORT "Yes, with scrnsaverproto")
-				include_directories(${X11_Xscreensaver_INCLUDE_PATH})
-				list(APPEND LIBS ${X11_Xscreensaver_LIB})
+				# QX11Info is needed to interact with Xscreensaver
+				if(COMPILE_QX11INFO_SUPPORT)
+					set(COMPILE_XSS_SUPPORT 1)
+					set(CMAKE_STATUS_X11_SUPPORT "Yes, with screensaverproto")
+					include_directories(${X11_Xscreensaver_INCLUDE_PATH})
+					list(APPEND LIBS ${X11_Xscreensaver_LIB})
+				else()
+					set(CMAKE_STATUS_X11_SUPPORT "Yes")
+				endif()
 			else()
 				set(CMAKE_STATUS_X11_SUPPORT "Yes")
 			endif()
-
 			include_directories(${X11_INCLUDE_DIR})
 			list(APPEND LIBS ${X11_LIBRARIES})
 			# Seems like ${X11_LIBRARIES} doesn't add -lXrender, which is needed
@@ -960,7 +1063,7 @@ endif()
 ############################################################################
 option(WANT_DCC_VIDEO "Compile DCC Video Support" OFF)
 
-if(WANT_DCC_VIDEO AND Qt5Widgets_FOUND)
+if(WANT_DCC_VIDEO AND CMAKE_RESULT_USING_QT5)
 	# QtMultimediaWidgets
 	find_package(Qt5MultimediaWidgets)
 	if(Qt5MultimediaWidgets_FOUND)
@@ -1367,14 +1470,18 @@ message(STATUS "   Memory Checks Support       : ${CMAKE_STATUS_MEMORY_CHECKS_SU
 message(STATUS "Features:")
 message(STATUS "   X11 Support                 : ${CMAKE_STATUS_X11_SUPPORT}")
 message(STATUS "   Qt Version                  : ${CMAKE_STATUS_QT_VERSION}")
-if(Qt5Widgets_FOUND)
+if(CMAKE_RESULT_USING_QT5)
     message(STATUS "   Qt Modules                  : ${qt5_kvirc_modules}")
 else()
     message(STATUS "   Qt-DBus Support             : ${CMAKE_STATUS_QTDBUS_SUPPORT}")
     message(STATUS "   Qt-WebKit Support           : ${CMAKE_STATUS_QTWEBKIT_SUPPORT}")
     message(STATUS "   Qt-Svg Support              : ${CMAKE_STATUS_QTSVG_SUPPORT}")
 endif()
-message(STATUS "   KDE4 Support                : ${CMAKE_STATUS_KDE4_SUPPORT}")
+message(STATUS "   Qt/X11 Interface            : ${CMAKE_STATUS_QX11INFO_SUPPORT}")
+message(STATUS "   KDE Support                 : ${CMAKE_STATUS_KDE_SUPPORT}")
+if(CMAKE_RESULT_USING_KDE)
+	message(STATUS "   KDE Version                 : ${CMAKE_STATUS_KDE_VERSION}")
+endif()
 message(STATUS "   IPv6 Support                : ${CMAKE_STATUS_IPV6_SUPPORT}")
 message(STATUS "   Pseudo-Transparency Support : ${CMAKE_STATUS_TRANSPARENCY_SUPPORT}")
 message(STATUS "   Spell Checker Support       : ${CMAKE_STATUS_SPELLCHECKER_SUPPORT}")
@@ -1399,6 +1506,10 @@ message(STATUS "   GetText Messages Tidying    : ${CMAKE_STATUS_MESSAGE_TIDY}")
 message(STATUS "   Doxygen Support             : ${CMAKE_STATUS_DOXYGEN_SUPPORT}")
 message(STATUS " ")
 message(STATUS "Build Date                     : ${CMAKE_KVIRC_BUILD_DATE}")
+message(STATUS "Build Version                  : ${CMAKE_KVIRC_VERSION_RELEASE}")
+message(STATUS "Build Codename                 : ${CMAKE_KVIRC_VERSION_CODENAME}")
+message(STATUS "Build Revision                 : ${CMAKE_KVIRC_BUILD_REVISION}")
+
 message(STATUS " ")
 if(MSVC)
 	message(STATUS "I'm ready to build KVIrc for you: please type 'nmake' now...")
@@ -1411,4 +1522,6 @@ endif()
 if(COMPILE_ENABLE_GTKSTYLE)
 	message(STATUS "Warning: you forcibly enabled the GtkStyle engine, which is known to break KVIrc theming.")
 endif()
+
 message(STATUS " ")
+

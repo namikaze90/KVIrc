@@ -124,16 +124,16 @@
 #endif
 
 #ifdef COMPILE_KDE_SUPPORT
-	#include <KStandardDirs>
+	#ifdef COMPILE_KDE4_SUPPORT
+		#include <KStandardDirs>
+	#else
+		#include <QStandardPaths>
+	#endif
 	#include <KNotification>
 #endif
 
-#ifdef COMPILE_X11_SUPPORT
-#if (QT_VERSION < 0x050000)
+#ifdef COMPILE_QX11INFO_SUPPORT
 	#include <QX11Info>
-#else
-	// FIXME: Need a replacement for this
-#endif
 #endif
 
 /*
@@ -737,14 +737,16 @@ bool KviApplication::supportsCompositing()
 	//we need >= win2000
 	return true;
 #endif
-#ifdef COMPILE_X11_SUPPORT
-#if (QT_VERSION < 0x050000)
-	return QX11Info::isCompositingManagerRunning();
-#else // QT_VERSION >= 0x050000
-	// FIXME: Need a replacement for this?
-	return false;
-#endif // QT_VERSION >= 0x050000
-#endif // COMPILE_X11_SUPPORT
+
+#ifdef COMPILE_QX11INFO_SUPPORT
+	#if (QT_VERSION >= 0x050000)
+		// Qt5 does not support QX11Info::isCompositingManagerRunning()
+		// Well...assume we're compositing capable, should be true on all recent linux distros
+		return true;
+	#else
+		return QX11Info::isCompositingManagerRunning();
+	#endif
+#endif // COMPILE_QX11INFO_SUPPORT
 #ifdef COMPILE_ON_MAC
 	return true;
 #endif
@@ -805,9 +807,13 @@ Let's see the scheme to understand which is choosen:
 
 		if(!bKNotifyConfigFileChecked)
 		{
-			QString szFileName = KStandardDirs::locateLocal("data",QString::fromAscii("kvirc/kvirc.notifyrc"));
+#ifdef COMPILE_KDE4_SUPPORT
+			QString szFileName = KStandardDirs::locateLocal("data",QString::fromUtf8("kvirc/kvirc.notifyrc"));
+#else
+			QString szFileName = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/" + QString::fromUtf8("kvirc/kvirc.notifyrc");
+#endif
 			if(szFileName.isEmpty())
-				szFileName = QString::fromAscii("%1/.kde/share/apps/kvirc/kvirc.notifyrc").arg(QDir::homePath());
+				szFileName = QString::fromUtf8("%1/.kde/share/apps/kvirc/kvirc.notifyrc").arg(QDir::homePath());
 
 			QFileInfo inf(szFileName);
 
@@ -890,8 +896,12 @@ Let's see the scheme to understand which is choosen:
 
 
 		KNotification * pNotify = 0;
-#if KDE_IS_VERSION(4,4,0)
+#if defined(COMPILE_KDE4_SUPPORT)
+	#if KDE_IS_VERSION(4,4,0)
 		pNotify = new KNotification("incomingMessage",KNotification::CloseWhenWidgetActivated,this);
+	#else
+		pNotify = new KNotification("incomingMessage",g_pMainWindow,KNotification::CloseWhenWidgetActivated);
+	#endif
 #else
 		pNotify = new KNotification("incomingMessage",g_pMainWindow,KNotification::CloseWhenWidgetActivated);
 #endif
@@ -900,7 +910,12 @@ Let's see the scheme to understand which is choosen:
 		pNotify->setText(szText);
 		pNotify->setActions(actions);
 		pNotify->setPixmap(*pIcon);
+
+#if defined(COMPILE_KDE4_SUPPORT)
 		pNotify->setComponentData(KComponentData(aboutData()));
+#else
+		pNotify->setComponentName("kvirc");
+#endif
 
 		connect(pNotify,SIGNAL(activated()),this,SLOT(showParentFrame()));
 		connect(pNotify,SIGNAL(action1Activated()),this,SLOT(showParentFrame()));
