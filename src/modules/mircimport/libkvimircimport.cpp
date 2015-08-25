@@ -27,6 +27,7 @@
 #include "KviModule.h"
 #include "KviFileDialog.h"
 #include "KviFileUtils.h"
+#include "KviMainWindow.h"
 #include "kvi_fileextensions.h"
 #include "KviLocale.h"
 #include "KviConfigurationFile.h"
@@ -122,7 +123,7 @@ void KviMircServersIniImport::start()
 {
 	//KviCString buffer;
 	QString buffer;
-	if(!KviFileDialog::askForOpenFileName(buffer,__tr("Choose a servers.ini file"),0,KVI_FILTER_INI,false,true))return;
+	if(!KviFileDialog::askForOpenFileName(buffer,__tr("Choose a servers.ini file"),0,KVI_FILTER_INI,false,true,g_pMainWindow))return;
 
 	doImport(buffer);
 	delete this;
@@ -143,6 +144,7 @@ KviRemoteMircServerImportWizard::KviRemoteMircServerImportWizard(KviRemoteMircSe
 	QString capt = __tr2qs("Remote mIRC servers.ini Import Wizard");
 	setWindowTitle(capt);
 
+	setModal(true);
 
 	m_pRequest = 0;
 	m_pFilter = f;
